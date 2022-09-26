@@ -23,6 +23,11 @@ int main(int argc, char* argv[])
     }
 
     int pid = fork();
+    // The execution continues from here for both processes. The order is undeterministic, but we can ensure it with wait().
+    // Return values of - fork
+    // -1 is error
+    // 0 is child process
+    // > 0 is parent
     if (pid < 0)
     {
         fprintf(2, "Fork failed.");
