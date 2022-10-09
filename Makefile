@@ -188,16 +188,12 @@ UPROGS=\
 	$U/_sh\
 	$U/_sleep\
 	$U/_stressfs\
+	$U/_uptime\
 	$U/_usertests\
 	$U/_grind\
 	$U/_wc\
 	$U/_xargs\
 	$U/_zombie\
-	$U/_sleep\
-	$U/_pingpong\
-	$U/_primes\
-	$U/_find\
-
 
 
 ifeq ($(LAB),$(filter $(LAB), lock))
