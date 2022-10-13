@@ -32,8 +32,7 @@ main(int argc, char *argv[])
 
 volatile static int count;
 
-void
-periodic()
+void periodic()
 {
   count = count + 1;
   printf("alarm!\n");

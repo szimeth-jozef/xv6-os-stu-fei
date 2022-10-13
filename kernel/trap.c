@@ -33,8 +33,7 @@ trapinithart(void)
 // handle an interrupt, exception, or system call from user space.
 // called from trampoline.S
 //
-void
-usertrap(void)
+void usertrap(void)
 {
   int which_dev = 0;
 
@@ -50,7 +49,8 @@ usertrap(void)
   // save user program counter.
   p->trapframe->epc = r_sepc();
   
-  if(r_scause() == 8){
+  if(r_scause() == 8)
+  {
     // system call
 
     if(killed(p))
@@ -78,7 +78,16 @@ usertrap(void)
 
   // give up the CPU if this is a timer interrupt.
   if(which_dev == 2)
+  {
+    if (p->alarm_handler != -1)
+    {
+      p->ticks_elapsed++;
+      if (p->ticks_elapsed >= p->alarm_interval)
+        p->trapframe->epc = p->alarm_handler;
+    }
+    
     yield();
+  }
 
   usertrapret();
 }
