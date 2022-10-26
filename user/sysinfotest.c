@@ -4,8 +4,7 @@
 #include "user/user.h"
 
 
-void
-sinfo(struct sysinfo *info) {
+void sinfo(struct sysinfo *info) {
   if (sysinfo(info) < 0) {
     printf("FAIL: sysinfo failed");
     exit(1);
@@ -15,21 +14,23 @@ sinfo(struct sysinfo *info) {
 //
 // use sbrk() to count how many free physical memory pages there are.
 //
-int
-countfree()
+int countfree()
 {
   uint64 sz0 = (uint64)sbrk(0);
   struct sysinfo info;
   int n = 0;
 
-  while(1){
-    if((uint64)sbrk(PGSIZE) == 0xffffffffffffffff){
+  while (1)
+  {
+    if ((uint64)sbrk(PGSIZE) == 0xffffffffffffffff)
       break;
-    }
+
     n += PGSIZE;
   }
+
   sinfo(&info);
-  if (info.freemem != 0) {
+  if (info.freemem != 0)
+  {
     printf("FAIL: there is no free mem, but sysinfo.freemem=%d\n",
       info.freemem);
     exit(1);
@@ -45,7 +46,7 @@ testmem() {
   
   sinfo(&info);
 
-  if (info.freemem!= n) {
+  if (info.freemem != n) {
     printf("FAIL: free mem %d (bytes) instead of %d\n", info.freemem, n);
     exit(1);
   }

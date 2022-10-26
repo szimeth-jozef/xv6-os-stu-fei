@@ -7,8 +7,10 @@ nechal som to bezat kym hitne breakpoint a potom prikazom backtrace som vypisal 
 - p->trapframe->a7 ma hodnotu 7, co reprezentuje systemove volanie exec. Ak sa nemylim do a7 sa zpisuje cislo sys volania, ktore sa ma vykonat.
 
 3. Aký je predchádzajúci mód, v ktorom sa nachádzal procesor? Podľa čoho ste to zistili?
-NOTE: su tri mody, v ktorom risc-v procesory operuju machine, privileged(supervisor) a user mode.
-- ??????
+- Procesor sa nachadzal v user mode. Zistil som to tak, ze som vypisal obsah registra sstatus. Z coho som zistil, ze bit SPP, t.j.
+z prava deviaty bit (8-mi index) je nastaveny na 0. Co znamena to, ze to je user mode. Presna dokumentacia znie:
+"The SPP bit indicates the privilege level at which a hart was executing before entering supervisor mode.
+When a trap is taken, SPP is set to 0 if the trap originated from user mode, or 1 otherwise."
 
 4. Zapíšte inštrukciu jazyka assembly na ktorej jadro vyvolalo panic. V ktorom registri je uložená hodnota num?
 - riadok je; 80001ff4:	00002683          	lw	a3,0(zero) # 0 <_entry-0x80000000>
@@ -20,5 +22,3 @@ Je v priestore jadra namapovaná adresa 0? Potvrdzuje to obsah registra scause v
 
 6. Aký je názov binárky, ktorá bežala, keď nastal panic? Aký je pid procesu?
 - Nazov binarky je "initcode" a pid je 1
-
-7. 

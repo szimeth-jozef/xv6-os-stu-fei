@@ -5,6 +5,8 @@
 #include "memlayout.h"
 #include "spinlock.h"
 #include "proc.h"
+#include "sysinfo.h"
+
 
 uint64 sys_exit(void)
 {
@@ -14,15 +16,18 @@ uint64 sys_exit(void)
   return 0;  // not reached
 }
 
+
 uint64 sys_getpid(void)
 {
   return myproc()->pid;
 }
 
+
 uint64 sys_fork(void)
 {
   return fork();
 }
+
 
 uint64 sys_wait(void)
 {
@@ -30,6 +35,7 @@ uint64 sys_wait(void)
   argaddr(0, &p);
   return wait(p);
 }
+
 
 uint64 sys_sbrk(void)
 {
@@ -42,6 +48,7 @@ uint64 sys_sbrk(void)
     return -1;
   return addr;
 }
+
 
 uint64 sys_sleep(void)
 {
@@ -67,6 +74,7 @@ uint64 sys_sleep(void)
   return 0;
 }
 
+
 uint64 sys_kill(void)
 {
   int pid;
@@ -74,6 +82,7 @@ uint64 sys_kill(void)
   argint(0, &pid);
   return kill(pid);
 }
+
 
 // return how many clock tick interrupts have occurred
 // since start.
@@ -87,12 +96,31 @@ uint64 sys_uptime(void)
   return xticks;
 }
 
+
 uint64 sys_trace(void)
 {
   int mask;
 
   argint(0, &mask);
   myproc()->trace_mask = mask;
+
+  return 0;
+}
+
+
+uint64 sys_sysinfo(void)
+{
+  uint64 spointer;  // pointer to struct stat in user-space
+  argaddr(0, &spointer);
+
+  struct proc* p = myproc();
+  struct sysinfo kinfo;
+
+  kinfo.freemem = getfreemem();
+  kinfo.nproc = getproccount();
+
+  if (copyout(p->pagetable, spointer, (char*)&kinfo, sizeof(kinfo)) < 0)
+    return -1;
 
   return 0;
 }
