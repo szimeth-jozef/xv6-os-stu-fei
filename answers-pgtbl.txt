@@ -1,4 +1,26 @@
-1. Ktoré iné systémové volania môžu byť urýchlené prostredníctvom tejto zdieľanej stránky? Vysvetlite ako. Odpovede zapíšte do príslušných súborov podľa testovacieho skriptu.
+1. Ktoré iné systémové volania môžu byť urýchlené prostredníctvom tejto zdieľanej stránky? Vysvetlite ako.
+Odpovede zapíšte do príslušných súborov podľa testovacieho skriptu.
 - Mozno uptime, by sa dalo, ale nvm. Bud uptime alebo uz sa neda iny syscall zrychlit
 
-2.
+2. Vysvetlite výstup funkcie vmprint() a jeho súvis s obrázkom 3.4 z xv6 knižky. Čo obsahuje stránka 0?
+Čo je v stránke 3? Keď proces beží v užívateľskom móde, môže prečítať/zapísať pamäť mapovanú stránkou 2?
+Čo obsahuje tretia stránka od konca? Odpovede zapíšte do príslušných súborov podľa testovacieho skriptu.
+- Vypis reprezentuje validne pte-cka strankovej tablky (pt) procesu s pid 1 t.j. init I think.
+Stranka 0 obsahuje program (text) I think
+Stranka 3 obsahuje bud heap, stack alebo data
+Nemoze prečítať/zapísať stranku 2 lebo nema PTE_U prava
+3. stranka od konca ma prava [R--U] a obsahuje ??????????????
+NOTE:
+vypis:
+Page table 0x0000000087f6b000
+..0: pte 0x0000000021fd9c01 pa 0x0000000087f67000  [----]
+....0: pte 0x0000000021fd9801 pa 0x0000000087f66000  [----]
+......0: pte 0x0000000021fda01b pa 0x0000000087f68000  [RX-U]
+......1: pte 0x0000000021fd9417 pa 0x0000000087f65000  [R-WU]
+......2: pte 0x0000000021fd9007 pa 0x0000000087f64000  [R-W-]
+......3: pte 0x0000000021fd8c17 pa 0x0000000087f63000  [R-WU]
+..255: pte 0x0000000021fda801 pa 0x0000000087f6a000  [----]
+....511: pte 0x0000000021fda401 pa 0x0000000087f69000  [----]
+......509: pte 0x0000000021fdcc13 pa 0x0000000087f73000  [R--U]
+......510: pte 0x0000000021fdd007 pa 0x0000000087f74000  [R-W-]
+......511: pte 0x0000000020001c0b pa 0x0000000080007000  [RX--]
