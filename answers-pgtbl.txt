@@ -1,0 +1,4 @@
+1. Ktoré iné systémové volania môžu byť urýchlené prostredníctvom tejto zdieľanej stránky? Vysvetlite ako. Odpovede zapíšte do príslušných súborov podľa testovacieho skriptu.
+- Mozno uptime, by sa dalo, ale nvm. Bud uptime alebo uz sa neda iny syscall zrychlit
+
+2.
