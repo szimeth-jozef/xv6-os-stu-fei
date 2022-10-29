@@ -48,24 +48,32 @@ sys_sbrk(void)
   return addr;
 }
 
-uint64
-sys_sleep(void)
+uint64 sys_sleep(void)
 {
   int n;
   uint ticks0;
 
+  backtrace();
+
   argint(0, &n);
-  if(n < 0)
+
+  if (n < 0)
     n = 0;
+
   acquire(&tickslock);
   ticks0 = ticks;
-  while(ticks - ticks0 < n){
-    if(killed(myproc())){
+
+  while (ticks - ticks0 < n)
+  {
+    if (killed(myproc()))
+    {
       release(&tickslock);
       return -1;
     }
+
     sleep(&ticks, &tickslock);
   }
+
   release(&tickslock);
   return 0;
 }
