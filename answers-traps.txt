@@ -1,0 +1,25 @@
+1. Ktoré registre obsahujú argumenty funkcií? V ktorom registri je napríklad uložené číslo 13 (argument funkcie printf())?
+- Po prestudovani asm subory vyzera, ze argumenty funkcii su ukladane do registrov a1, a2, .... Cislo 13 je uloze do registra a2
+
+2. Kde je volanie funkcie f() z funkcie main()? Kde je volanie funkcie g()? (Pomôcka: Kompilátor môže funkcie inlinovať).
+- f() je volane v parametri printu a g() je volane z f()
+
+3. Na ktorej adrese sa nachádza funkcia printf()?
+- na adrese 64a
+
+4. Aká hodnota je v registri ra hneď po jalr do funkcie printf() vo funkcii main()?
+- 0x38
+
+5. Spustite tento kód:
+  unsigned int i = 0x00646c72;
+  printf("H%x Wo%s\n", 57616, &i);
+
+Aký je jeho výstup? Aký bude výstup závisí od toho, či je architektúra RISC-V little-endian.
+Ak by bol RISC-V big-endian, akú hodnotu by ste museli priradiť premennej i, aby bol výstup totožný?
+Bolo by tiež potrebné zmeniť hodnotu 57616?
+- Vystup je: HE110 World, dalsie odpovede idk
+
+6. Čo bude na výpise za 'y=' v nižšie uvedenom kóde?
+(poznámka: nie je to žiadna špecifická hodnota.) Prečo sa to deje?
+printf("x=%d y=%d", 3);
+- V mojom pripade y=1, neviem preco sa to deje maybe default value or garbage value idk

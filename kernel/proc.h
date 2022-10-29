@@ -106,6 +106,7 @@ struct proc {
   char name[16];               // Process name (debugging)
 
   int alarm_interval;
+  int alarm_elapsed;
   uint64 alarm_handler;
-  int ticks_elapsed;
+  struct trapframe etpfm;
 };

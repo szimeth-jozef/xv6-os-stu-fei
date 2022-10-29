@@ -125,8 +125,6 @@ found:
   p->pid = allocpid();
   p->state = USED;
 
-  p->alarm_handler = -1;
-
   // Allocate a trapframe page.
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
     freeproc(p);
@@ -147,6 +145,11 @@ found:
   memset(&p->context, 0, sizeof(p->context));
   p->context.ra = (uint64)forkret;
   p->context.sp = p->kstack + PGSIZE;
+
+  // Initialize alarm
+  p->alarm_interval = 0;
+  p->alarm_elapsed = 0;
+  p->alarm_handler = 0;
 
   return p;
 }
