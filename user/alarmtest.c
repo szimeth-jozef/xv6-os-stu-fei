@@ -20,8 +20,7 @@ void periodic();
 void slow_handler();
 void dummy_handler();
 
-int
-main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
   test0();
   test1();
@@ -34,7 +33,7 @@ volatile static int count;
 
 void periodic()
 {
-  count = count + 1;
+  count++;
   printf("alarm!\n");
   sigreturn();
 }
@@ -165,8 +164,7 @@ void slow_handler()
 //
 // dummy alarm handler; after running immediately uninstall
 // itself and finish signal handling
-void
-dummy_handler()
+void dummy_handler()
 {
   sigalarm(0, 0);
   sigreturn();
@@ -175,8 +173,7 @@ dummy_handler()
 //
 // tests that the return from sys_sigreturn() does not
 // modify the a0 register
-void
-test3()
+void test3()
 {
   uint64 a0;
 
@@ -189,7 +186,9 @@ test3()
     ;
   asm volatile("mv %0, a0" : "=r" (a0) );
 
-  if(a0 != 0xac)
+  printf("TEST: value of a0=%d\n", a0);
+
+  if (a0 != 0xac)
     printf("test3 failed: register a0 changed\n");
   else
     printf("test3 passed\n");

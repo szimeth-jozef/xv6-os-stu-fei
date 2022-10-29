@@ -30,23 +30,22 @@ fetchstr(uint64 addr, char *buf, int max)
   return strlen(buf);
 }
 
-static uint64
-argraw(int n)
+static uint64 argraw(int n)
 {
   struct proc *p = myproc();
   switch (n) {
-  case 0:
-    return p->trapframe->a0;
-  case 1:
-    return p->trapframe->a1;
-  case 2:
-    return p->trapframe->a2;
-  case 3:
-    return p->trapframe->a3;
-  case 4:
-    return p->trapframe->a4;
-  case 5:
-    return p->trapframe->a5;
+    case 0:
+      return p->trapframe->a0;
+    case 1:
+      return p->trapframe->a1;
+    case 2:
+      return p->trapframe->a2;
+    case 3:
+      return p->trapframe->a3;
+    case 4:
+      return p->trapframe->a4;
+    case 5:
+      return p->trapframe->a5;
   }
   panic("argraw");
   return -1;

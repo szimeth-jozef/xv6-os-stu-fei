@@ -86,7 +86,7 @@ void usertrap(void)
     if (p->alarm_interval)
     {
       p->alarm_elapsed++;
-      if (p->alarm_elapsed >= p->alarm_interval)
+      if (p->alarm_elapsed == p->alarm_interval)
       {
         memmove(&(p->etpfm), p->trapframe, sizeof(struct trapframe));
         p->trapframe->epc = p->alarm_handler;
