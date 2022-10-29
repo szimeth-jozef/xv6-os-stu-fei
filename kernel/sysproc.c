@@ -122,5 +122,5 @@ uint64 sys_sigreturn(void)
   struct proc* p = myproc();
   memmove(p->trapframe, &(p->etpfm), sizeof(struct trapframe));
   p->alarm_elapsed = 0;
-  return 0;
+  return p->trapframe->a0;
 }
