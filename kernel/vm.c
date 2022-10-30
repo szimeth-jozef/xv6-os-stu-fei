@@ -461,31 +461,37 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
   }
 }
 
-// int _uvmcow(pte_t* pte)
-// {
-//   char* mem = kalloc();
-//   if (mem == 0)
-//     return -1;
+int _uvmcow(pte_t* pte)
+{
+  char* mem = kalloc();
+  if (mem == 0)
+    return -1;
 
-//   uint64 pa = PTE2PA(*pte);
-//   if (pa == 0)
-//     return -1;
+  uint64 pa = PTE2PA(*pte);
+  if (pa == 0)
+    return -1;
 
-//   memmove(mem, (char*)pa, PGSIZE);
-//   kfree((void*)pa);
+  memmove(mem, (char*)pa, PGSIZE);
+  kfree((void*)pa);
 
-//   *pte &= ~PTE_COW;
-//   *pte |= PTE_W;
-//   uint64 flags = PTE_FLAGS(*pte);
-//   *pte = PA2PTE(mem) | flags;
+  *pte &= ~PTE_COW;
+  *pte |= PTE_W;
+  uint64 flags = PTE_FLAGS(*pte);
+  *pte = PA2PTE(mem) | flags;
 
-//   return 0;
-// }
+  // uvmunmap(pagetable, PGROUNDDOWN(addr), 1, 0);
+  // if (mappages(pagetable, PGROUNDDOWN(addr), PGSIZE, (uint64)mem, flags) != 0)
+  // {
+  //   kfree(mem);
+  //   return -1;
+  // }
+
+  return 0;
+}
 
 int uvmcow(pagetable_t pagetable, uint64 addr)
 {
   pte_t* pte;
-  char* mem;
 
   if (addr >= MAXVA)
     return -1;
@@ -499,22 +505,5 @@ int uvmcow(pagetable_t pagetable, uint64 addr)
   if ((*pte & PTE_COW) == 0)
     return -1;
 
-  if ((mem = kalloc()) == 0)
-    return -1;
-
-  uint64 pa = PTE2PA(*pte);
-
-  uint flags = PTE_FLAGS(*pte);
-  flags |= PTE_W;
-  flags &= ~PTE_COW;
-
-  memmove(mem, (char*)pa, PGSIZE);
-  uvmunmap(pagetable, PGROUNDDOWN(addr), 1, 0);
-  if (mappages(pagetable, PGROUNDDOWN(addr), PGSIZE, (uint64)mem, flags) != 0)
-  {
-    kfree(mem);
-    return -1;
-  }
-
-  return 0;
+  return _uvmcow(pte);
 }
