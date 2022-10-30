@@ -82,19 +82,21 @@ kvminithart()
 //   21..29 -- 9 bits of level-1 index.
 //   12..20 -- 9 bits of level-0 index.
 //    0..11 -- 12 bits of byte offset within the page.
-pte_t *
-walk(pagetable_t pagetable, uint64 va, int alloc)
+pte_t* walk(pagetable_t pagetable, uint64 va, int alloc)
 {
-  if(va >= MAXVA)
+  if (va >= MAXVA)
     panic("walk");
 
-  for(int level = 2; level > 0; level--) {
-    pte_t *pte = &pagetable[PX(level, va)];
-    if(*pte & PTE_V) {
+  for (int level = 2; level > 0; level--)
+  {
+    pte_t* pte = &pagetable[PX(level, va)];
+    if (*pte & PTE_V)
       pagetable = (pagetable_t)PTE2PA(*pte);
-    } else {
-      if(!alloc || (pagetable = (pde_t*)kalloc()) == 0)
+    else
+    {
+      if (!alloc || (pagetable = (pde_t*)kalloc()) == 0)
         return 0;
+
       memset(pagetable, 0, PGSIZE);
       *pte = PA2PTE(pagetable) | PTE_V;
     }
@@ -302,28 +304,33 @@ uvmfree(pagetable_t pagetable, uint64 sz)
 // physical memory.
 // returns 0 on success, -1 on failure.
 // frees any allocated pages on failure.
-int
-uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
+int uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
 {
-  pte_t *pte;
+  pte_t* pte;
   uint64 pa, i;
   uint flags;
-  char *mem;
 
-  for(i = 0; i < sz; i += PGSIZE){
-    if((pte = walk(old, i, 0)) == 0)
+  for (i = 0; i < sz; i += PGSIZE)
+  {
+    if ((pte = walk(old, i, 0)) == 0)
       panic("uvmcopy: pte should exist");
-    if((*pte & PTE_V) == 0)
+
+    if ((*pte & PTE_V) == 0)
       panic("uvmcopy: page not present");
+
     pa = PTE2PA(*pte);
-    flags = PTE_FLAGS(*pte);
-    if((mem = kalloc()) == 0)
-      goto err;
-    memmove(mem, (char*)pa, PGSIZE);
-    if(mappages(new, i, PGSIZE, (uint64)mem, flags) != 0){
-      kfree(mem);
-      goto err;
+    
+    if (*pte & PTE_W)
+    {
+      *pte &= ~PTE_W;
+      *pte |= PTE_COW;
     }
+    
+    flags = PTE_FLAGS(*pte);
+    if (mappages(new, i, PGSIZE, (uint64)pa, flags) != 0)
+      goto err;
+    
+    inc_ref((void*)pa);
   }
   return 0;
 
@@ -348,25 +355,41 @@ uvmclear(pagetable_t pagetable, uint64 va)
 // Copy from kernel to user.
 // Copy len bytes from src to virtual address dstva in a given page table.
 // Return 0 on success, -1 on error.
-int
-copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
+int copyout(pagetable_t pagetable, uint64 dstva, char* src, uint64 len)
 {
   uint64 n, va0, pa0;
+  pte_t* pte;
 
-  while(len > 0){
+  while (len > 0)
+  {
     va0 = PGROUNDDOWN(dstva);
-    pa0 = walkaddr(pagetable, va0);
-    if(pa0 == 0)
+    if (va0 >= MAXVA)
       return -1;
+
+    if ((pte = walk(pagetable, PGROUNDDOWN(dstva), 0)) == 0)
+      return -1;
+
+    if ((*pte & PTE_V) == 0)
+      return -1;
+
+    if ((*pte & PTE_COW) && uvmcow(pagetable, va0) != 0)
+        panic("uvmcow failed");
+
+    pa0 = walkaddr(pagetable, va0);
+    if (pa0 == 0)
+      return -1;
+
     n = PGSIZE - (dstva - va0);
-    if(n > len)
+    if (n > len)
       n = len;
+
     memmove((void *)(pa0 + (dstva - va0)), src, n);
 
     len -= n;
     src += n;
     dstva = va0 + PGSIZE;
   }
+
   return 0;
 }
 
@@ -436,4 +459,62 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
   } else {
     return -1;
   }
+}
+
+// int _uvmcow(pte_t* pte)
+// {
+//   char* mem = kalloc();
+//   if (mem == 0)
+//     return -1;
+
+//   uint64 pa = PTE2PA(*pte);
+//   if (pa == 0)
+//     return -1;
+
+//   memmove(mem, (char*)pa, PGSIZE);
+//   kfree((void*)pa);
+
+//   *pte &= ~PTE_COW;
+//   *pte |= PTE_W;
+//   uint64 flags = PTE_FLAGS(*pte);
+//   *pte = PA2PTE(mem) | flags;
+
+//   return 0;
+// }
+
+int uvmcow(pagetable_t pagetable, uint64 addr)
+{
+  pte_t* pte;
+  char* mem;
+
+  if (addr >= MAXVA)
+    return -1;
+
+  if ((pte = walk(pagetable, PGROUNDDOWN(addr), 0)) == 0)
+    return -1;
+
+  if ((*pte & PTE_V) == 0)
+    return -1;
+
+  if ((*pte & PTE_COW) == 0)
+    return -1;
+
+  if ((mem = kalloc()) == 0)
+    return -1;
+
+  uint64 pa = PTE2PA(*pte);
+
+  uint flags = PTE_FLAGS(*pte);
+  flags |= PTE_W;
+  flags &= ~PTE_COW;
+
+  memmove(mem, (char*)pa, PGSIZE);
+  uvmunmap(pagetable, PGROUNDDOWN(addr), 1, 0);
+  if (mappages(pagetable, PGROUNDDOWN(addr), PGSIZE, (uint64)mem, flags) != 0)
+  {
+    kfree(mem);
+    return -1;
+  }
+
+  return 0;
 }
