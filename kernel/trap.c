@@ -70,19 +70,15 @@ void usertrap(void)
   else if (scause == 15 || scause == 13)
   {
     uint64 va = r_stval();
-    if (va >= MAXVA)
+
+    // if (va <= PGROUNDDOWN(p->trapframe->sp) && va >= PGROUNDDOWN(p->trapframe->sp) - PGSIZE)
+    if ((va <= PGROUNDDOWN(p->trapframe->sp) && va >= PGROUNDDOWN(p->trapframe->sp) - PGSIZE) || va < PGSIZE)
     {
       p->killed = 1;
       exit(-1);
     }
 
-    if (va <= PGROUNDDOWN(p->trapframe->sp) && va >= PGROUNDDOWN(p->trapframe->sp) -PGSIZE)
-    {
-      p->killed = 1;
-      exit(-1);
-    }
-
-    if (uvmcow(p->pagetable, va) != 0)
+    if (uvmcow(p->pagetable, PGROUNDDOWN(va)) != 0)
       p->killed = 1;
   }
   else if ((which_dev = devintr()) != 0)

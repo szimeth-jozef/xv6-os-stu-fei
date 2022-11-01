@@ -358,22 +358,13 @@ uvmclear(pagetable_t pagetable, uint64 va)
 int copyout(pagetable_t pagetable, uint64 dstva, char* src, uint64 len)
 {
   uint64 n, va0, pa0;
-  pte_t* pte;
 
   while (len > 0)
   {
     va0 = PGROUNDDOWN(dstva);
-    if (va0 >= MAXVA)
-      return -1;
 
-    if ((pte = walk(pagetable, PGROUNDDOWN(dstva), 0)) == 0)
-      return -1;
-
-    if ((*pte & PTE_V) == 0)
-      return -1;
-
-    if ((*pte & PTE_COW) && uvmcow(pagetable, va0) != 0)
-        panic("uvmcow failed");
+    if (uvmcow(pagetable, va0) != 0)
+        return -1;
 
     pa0 = walkaddr(pagetable, va0);
     if (pa0 == 0)
@@ -461,49 +452,52 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
   }
 }
 
-int _uvmcow(pte_t* pte)
+int uvmcow(pagetable_t pagetable, uint64 addr)
 {
-  char* mem = kalloc();
-  if (mem == 0)
+  // pagetable - pt of the process that caused page fault
+  // addr - address where the page fault occured
+
+  // 1. Allocate new page with kalloc
+  // 2. Copy contents of the current page where PTE_COW is set to the newly allocated page
+  // 3. Map newly allocated page with PTE_W
+
+  if (addr >= MAXVA)
     return -1;
+
+  // addr must be PGSIZE aligned
+  if ((addr % PGSIZE) != 0)
+    return -1;
+
+  pte_t* pte = walk(pagetable, addr, 0);
+  if (pte == 0 || (*pte & PTE_V) == 0)
+    return -1;
+
+  // If not PTE_COW return silently
+  if ((*pte & PTE_COW) == 0)
+    return 0;
 
   uint64 pa = PTE2PA(*pte);
   if (pa == 0)
     return -1;
 
-  memmove(mem, (char*)pa, PGSIZE);
-  kfree((void*)pa);
-
-  *pte &= ~PTE_COW;
-  *pte |= PTE_W;
   uint64 flags = PTE_FLAGS(*pte);
-  *pte = PA2PTE(mem) | flags;
+  flags &= ~PTE_COW;
+  flags |= PTE_W;
 
-  // uvmunmap(pagetable, PGROUNDDOWN(addr), 1, 0);
-  // if (mappages(pagetable, PGROUNDDOWN(addr), PGSIZE, (uint64)mem, flags) != 0)
-  // {
-  //   kfree(mem);
-  //   return -1;
-  // }
+  // 1. Allocate new page
+  char* newpg = kalloc();
+  if (newpg == 0)
+    return -1;
+
+  // 2. Copy content and remove reference to old frame
+  memmove(newpg, (char*)pa, PGSIZE);
+  //kfree((void*)pa);
+
+  // 2.5 Unmap old frame, which will call free which will decrement ref count
+  uvmunmap(pagetable, PGROUNDUP(addr), 1, 1);
+
+  // 3. Map new page
+  mappages(pagetable, addr, PGSIZE, (uint64)newpg, flags);
 
   return 0;
-}
-
-int uvmcow(pagetable_t pagetable, uint64 addr)
-{
-  pte_t* pte;
-
-  if (addr >= MAXVA)
-    return -1;
-
-  if ((pte = walk(pagetable, PGROUNDDOWN(addr), 0)) == 0)
-    return -1;
-
-  if ((*pte & PTE_V) == 0)
-    return -1;
-
-  if ((*pte & PTE_COW) == 0)
-    return -1;
-
-  return _uvmcow(pte);
 }
