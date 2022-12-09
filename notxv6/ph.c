@@ -14,7 +14,8 @@ struct entry {
     struct entry *next;
 };
 
-struct entry *table[NBUCKET];
+struct entry* table[NBUCKET];
+pthread_mutex_t locks[NBUCKET];
 int keys[NKEYS];
 int nthread = 1;
 
@@ -26,19 +27,25 @@ double now()
     return tv.tv_sec + tv.tv_usec / 1000000.0;
 }
 
-static void insert(int key, int value, struct entry **p, struct entry *n)
+static void insert(
+    int key,
+    int value,
+    struct entry **bucket_addr,
+    struct entry *current_bucket_head
+)
 {
     struct entry *e = malloc(sizeof(struct entry));
     e->key = key;
     e->value = value;
-    e->next = n;
-    *p = e;
+    e->next = current_bucket_head;
+    *bucket_addr = e;
 }
 
 static void put(int key, int value)
 {
     int i = key % NBUCKET;
 
+    pthread_mutex_lock(&locks[i]);
     // is the key already present?
     struct entry *e = 0;
     for (e = table[i]; e != 0; e = e->next)
@@ -55,7 +62,7 @@ static void put(int key, int value)
         // the new is new.
         insert(key, value, &table[i], table[i]);
     }
-
+    pthread_mutex_unlock(&locks[i]);
 }
 
 static struct entry* get(int key)
@@ -63,8 +70,10 @@ static struct entry* get(int key)
     int i = key % NBUCKET;
 
     struct entry *e = 0;
+    pthread_mutex_lock(&locks[i]);
     for (e = table[i]; e != 0; e = e->next)
         if (e->key == key) break;
+    pthread_mutex_unlock(&locks[i]);
 
     return e;
 }
@@ -97,16 +106,19 @@ static void* get_thread(void* xa)
 
 int main(int argc, char *argv[])
 {
-    pthread_t *tha;
-    void *value;
+    pthread_t* tha;  // I suppose this is the thread pool
+    void* value;
     double t1, t0;
-
 
     if (argc < 2)
     {
         fprintf(stderr, "Usage: %s nthreads\n", argv[0]);
         exit(-1);
     }
+
+    // Initialize locks
+    for (int i = 0; i < NBUCKET; i++)
+        pthread_mutex_init(&locks[i], NULL);
 
     nthread = atoi(argv[1]);
     tha = malloc(sizeof(pthread_t) * nthread);
@@ -121,7 +133,8 @@ int main(int argc, char *argv[])
     t0 = now();
     for (int i = 0; i < nthread; i++)
     {
-        assert(pthread_create(&tha[i], NULL, put_thread, (void *) (long) i) == 0);
+        int success = pthread_create(&tha[i], NULL, put_thread, (void*) (long) i);
+        assert(success == 0);
     }
 
     for(int i = 0; i < nthread; i++)

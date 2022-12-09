@@ -1,0 +1,4 @@
+1. Prečo v tabuľke chýbali kľúče, keď sme použili dve vlákna, ale všetko bolo v poriadku pri jednom vlákne? Nájdite postupnosť udalostí v dvoch vláknach, ktoré spôsobia takýto problém.
+1. Pri viacerych vlakien sa moze nastat, ze oba vlakna insertuju nejaku key-value pair a zhodou okolnosti oba kluce maju rovnaky hash t.j. budu sa ukladat do rovankeho bucketu.
+   Prve vlakno vytvory entry do bucketu napoji ho na zaciatok bucketu, zatial vsetko v poriadku. Druhe vlakno spravy to iste, vytvory entry a napoji ho na povodny zaciatok bucketu
+   a tak entry, ktore vytvorilo prve vlakno ostane vysiet (neukazuje nanho ziadny pointer) t.j. nastal memory leak
