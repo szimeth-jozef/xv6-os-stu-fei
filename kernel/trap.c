@@ -5,6 +5,10 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "defs.h"
+#include "sleeplock.h"
+#include "fs.h"
+#include "file.h"
+#include "fcntl.h"
 
 struct spinlock tickslock;
 uint ticks;
@@ -46,11 +50,13 @@ usertrap(void)
   w_stvec((uint64)kernelvec);
 
   struct proc *p = myproc();
-  
+
   // save user program counter.
   p->trapframe->epc = r_sepc();
-  
-  if(r_scause() == 8){
+
+  uint64 scause = r_scause();
+  if(scause == 8)
+  {
     // system call
 
     if(killed(p))
@@ -65,10 +71,57 @@ usertrap(void)
     intr_on();
 
     syscall();
-  } else if((which_dev = devintr()) != 0){
+  }
+  else if (scause == 13 || scause == 15)
+  {
+    if (!map_mmap(p, r_stval()))
+    {
+        printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
+        printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
+        p->killed = 1;
+    }
+    // struct vma* vma = find_vma_by_address(p, r_stval());
+    // if (vma == 0)
+    //   exit(-1);
+
+    // // TODO: check permissions
+
+    // char* mem = kalloc();
+    // if (mem == 0)
+    //   exit(-1);
+    
+    // memset(mem, 0, PGSIZE);
+
+    // struct file* f = vma->f;
+    // uint offset = vma->offset + PGROUNDDOWN(r_stval()) - vma->address;
+    // ilock(f->ip);
+    // if (readi(f->ip, 0, (uint64)mem, offset, PGSIZE) <= 0)
+    // {
+    //   kfree(mem);
+    //   iunlock(f->ip);
+    //   exit(-1);
+    // }
+    // iunlock(f->ip);
+    // // TODO map with correct flags
+    // int perm = PTE_U;
+    // if (vma->prot & PROT_READ)
+    //   perm |= PTE_R;
+    // if (vma->prot & PROT_WRITE)
+    //   perm |= PTE_W;
+    
+    // if (mappages(p->pagetable, PGROUNDDOWN(r_stval()), PGSIZE, (uint64)mem, perm) != 0)
+    // {
+    //   kfree(mem);
+    //   exit(-1);
+    // }
+  }
+  else if ((which_dev = devintr()) != 0)
+  {
     // ok
-  } else {
-    printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
+  }
+  else
+  {
+    printf("usertrap(): unexpected scause %p pid=%d\n", scause, p->pid);
     printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
     setkilled(p);
   }

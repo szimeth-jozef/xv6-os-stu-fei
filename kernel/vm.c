@@ -5,6 +5,11 @@
 #include "riscv.h"
 #include "defs.h"
 #include "fs.h"
+#include "spinlock.h"
+#include "sleeplock.h"
+#include "fcntl.h"
+#include "file.h"
+#include "proc.h"
 
 /*
  * the kernel's page table.
@@ -173,17 +178,20 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)
   uint64 a;
   pte_t *pte;
 
-  if((va % PGSIZE) != 0)
+  if ((va % PGSIZE) != 0)
     panic("uvmunmap: not aligned");
 
-  for(a = va; a < va + npages*PGSIZE; a += PGSIZE){
-    if((pte = walk(pagetable, a, 0)) == 0)
-      panic("uvmunmap: walk");
-    if((*pte & PTE_V) == 0)
-      panic("uvmunmap: not mapped");
+  for (a = va; a < va + npages*PGSIZE; a += PGSIZE)
+  {
+    if ((pte = walk(pagetable, a, 0)) == 0) continue;
+    //   panic("uvmunmap: walk");
+    // if((*pte & PTE_V) == 0)
+    //   panic("uvmunmap: not mapped");
     if(PTE_FLAGS(*pte) == PTE_V)
       panic("uvmunmap: not a leaf");
-    if(do_free){
+
+    if (do_free && (*pte & PTE_V) != 0)
+    {
       uint64 pa = PTE2PA(*pte);
       kfree((void*)pa);
     }
@@ -310,11 +318,15 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
   uint flags;
   char *mem;
 
-  for(i = 0; i < sz; i += PGSIZE){
-    if((pte = walk(old, i, 0)) == 0)
+  for (i = 0; i < sz; i += PGSIZE)
+  {
+    if ((pte = walk(old, i, 0)) == 0)
       panic("uvmcopy: pte should exist");
-    if((*pte & PTE_V) == 0)
-      panic("uvmcopy: page not present");
+
+    if ((*pte & PTE_V) == 0)
+      // panic("uvmcopy: page not present");
+      continue;
+
     pa = PTE2PA(*pte);
     flags = PTE_FLAGS(*pte);
     if((mem = kalloc()) == 0)
@@ -436,4 +448,86 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
   } else {
     return -1;
   }
+}
+
+struct vma* find_empty_vma(struct proc* p)
+{
+  for (int i = 0; i < VMA_MAX; i++)
+    if (p->vma[i].f == 0)
+      return &p->vma[i];
+
+  return 0;
+}
+
+// Find address to map file
+// uint64 alloc_mmap(struct proc* p)
+// {
+//   uint64 start = MMAP;
+
+//   for (int i = 0; i < VMA_MAX; i++)
+//   {
+//     struct vma myvma = p->vma[i];
+
+//     if (myvma.f != 0)
+//     {
+//       uint64 new_addr = myvma.address + myvma.length;
+//       if (new_addr > start)
+//         start = new_addr;
+//     }
+//   }
+
+//   return start;
+// }
+
+// struct vma* find_vma_by_address(struct proc* p, uint64 addr)
+// {
+//   for (int i = 0; i < VMA_MAX; i++)
+//   {
+//     struct vma* myvma = &p->vma[i];
+
+//     if (myvma->f != 0)
+//     {
+//       if (addr >= myvma->address && addr < myvma->address + myvma->length)
+//         return myvma;
+//     }
+//   }
+
+//   return 0;
+// }
+
+int map_mmap(struct proc *p, uint64 addr) {
+  for (int i = 0; i < VMA_MAX; i++)
+  {
+    struct vma* v = &p->vma[i];
+    if (v->length != 0 && addr < v->end_addr && addr >= v->start_addr)
+    {
+      uint64 start = PGROUNDDOWN(addr);
+      uint64 offset = start - v->start_addr + v->offset;
+
+      char* mem = kalloc();
+      if (!mem)
+        return 0;
+            
+      memset(mem, 0, PGSIZE);
+
+      // PROT_NONE       0x0   PTE_V (1L << 0)
+      // PROT_READ       0x1   PTE_R (1L << 1)
+      // PROT_WRITE      0x2   PTE_W (1L << 2)
+      // PROT_EXEC       0x4   PTE_X (1L << 3)
+      //                       PTE_U (1L << 4)
+      if(mappages(p->pagetable, start, PGSIZE,
+                  (uint64)mem, (v->prot<<1)|PTE_U) != 0
+        )
+      {
+          kfree(mem);
+          return 0;
+      }
+
+      ilock(v->f->ip);
+      readi(v->f->ip, 1, start, offset, PGSIZE);
+      iunlock(v->f->ip);
+      return 1;
+    }
+  }
+  return 0;
 }

@@ -15,17 +15,17 @@
 #include "sleeplock.h"
 #include "file.h"
 #include "fcntl.h"
+#include "memlayout.h"
 
 // Fetch the nth word-sized system call argument as a file descriptor
 // and return both the descriptor and the corresponding struct file.
-static int
-argfd(int n, int *pfd, struct file **pf)
+static int argfd(int n, int* pfd, struct file** pf)
 {
   int fd;
-  struct file *f;
+  struct file* f;
 
   argint(n, &fd);
-  if(fd < 0 || fd >= NOFILE || (f=myproc()->ofile[fd]) == 0)
+  if (fd < 0 || fd >= NOFILE || (f = myproc()->ofile[fd]) == 0)
     return -1;
   if(pfd)
     *pfd = fd;
@@ -501,5 +501,145 @@ sys_pipe(void)
     fileclose(wf);
     return -1;
   }
+  return 0;
+}
+
+uint64 sys_mmap(void)
+{
+  // prot - protection
+  // uint64 addr;
+  int length, prot, flags, fd, offset;
+  struct file* f;
+
+  // argaddr(0, &addr);
+  argint(1, &length);
+  argint(2, &prot);
+  argint(3, &flags);
+  if (argfd(4, &fd, &f) < 0)
+    return -1;
+  argint(5, &offset);
+
+  if(!f->writable && (prot & PROT_WRITE) && (flags & MAP_SHARED))
+        return -1;
+
+  struct proc* proc = myproc();
+  
+  struct vma* vma = find_empty_vma(proc);
+  if (vma == 0)
+    return -1;
+
+  vma->length = length;
+  vma->start_addr = proc->sz;
+  vma->flags = flags;
+  vma->prot = prot;
+  vma->offset = 0;
+  vma->f = filedup(f);
+  proc->sz += PGROUNDUP(length);
+  vma->end_addr = proc->sz;
+  return vma->start_addr;
+
+  // if (flags & MAP_SHARED &&
+  //     !proc->ofile[fd]->writable &&
+  //     prot & PROT_WRITE)
+  // {
+  //   return -1;
+  // }
+
+  // uint64 mmap_addr = alloc_mmap(proc);
+  // if (mmap_addr + length >= TRAPFRAME)
+  //   return -1;
+
+  // vma->f = proc->ofile[fd];
+  // filedup(vma->f);
+  // vma->address = mmap_addr;
+
+  // return mmap_addr;
+}
+
+int filewrite_offset(struct file* f, uint64 addr, int n, int offset)
+{
+  int r, ret = 0;
+  if (f->writable == 0)
+    return -1;
+
+  if (f->type != FD_INODE)
+    panic("filewrite: only FINODE implemented!");
+
+  int max = ((MAXOPBLOCKS-1-1-2) / 2) * BSIZE;
+  int i = 0;
+  while(i < n)
+  {
+    int n1 = n - i;
+    if (n1 > max)
+      n1 = max;
+
+    begin_op();
+    ilock(f->ip);
+    if ((r = writei(f->ip, 1, addr + i, offset, n1)) > 0)
+      offset += r;
+    iunlock(f->ip);
+    end_op();
+
+    if (r != n1)
+      break;
+    i += r;
+  }
+
+  ret = (i == n ? n : -1);
+  return ret;
+}
+
+uint64 sys_munmap(void)
+{
+  // Three case:
+  // 1. unmap pages from the beginning (change address)
+  // 2. unmap pages from the end (change length)
+  // 3. unmap whole file
+
+  uint64 addr;
+  int length;
+
+  argaddr(0, &addr);
+  argint(1, &length);
+
+  struct proc* p = myproc();
+  for (int i = 0; i < VMA_MAX; i++)
+  {
+    struct vma* v = &p->vma[i];
+    if (v->length != 0 && addr < v->end_addr && addr >= v->start_addr)
+    {
+      int should_close = 0;
+      int offset = v->offset;
+      addr = PGROUNDDOWN(addr);
+      length = PGROUNDUP(length);
+      if (addr == v->start_addr)
+      {
+        if (length == v->length)
+        {
+          v->length = 0;
+          should_close = 1;
+        }
+        else
+        {
+          v->start_addr += length;
+          v->length -= length;
+          v->offset += length;
+        }
+      }
+      else
+      {
+        v->length -= length;
+      }
+      if (v->flags & MAP_SHARED)
+      {
+        filewrite_offset(v->f, addr, length, offset);
+      }
+
+      uvmunmap(p->pagetable, addr, length/PGSIZE, 1);
+      if(should_close)
+        fileclose(v->f);
+    }
+  }
+
   return 0;
 }
